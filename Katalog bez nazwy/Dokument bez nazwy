@@ -1,0 +1,430 @@
+package com.example.andoirdkalkulator;
+
+
+
+import android.os.Bundle;
+import android.app.Activity;
+import android.view.Menu;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.TextView;
+
+public class AndoirdKalkulator extends Activity {
+
+	private TextView textView_large;
+	private TextView textView_medium;
+	private TextView textView_small;
+	private TextView textView_operation_medium;
+	private TextView textView_operation_small;
+	
+	private Kalkulator kalkulator;
+	
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_andoird_kalkulator);
+		
+		kalkulator = new Kalkulator();
+		textView_large = (TextView) findViewById(R.id.textView_large);
+		textView_medium = (TextView) findViewById(R.id.textView_medium);
+		textView_small = (TextView) findViewById(R.id.textView_small);
+		textView_operation_medium = (TextView) findViewById(R.id.textView_operation_medium);
+		textView_operation_small = (TextView) findViewById(R.id.textView_operation_small);
+		
+		Listener_Buttons buttonListener = new Listener_Buttons(this);
+
+		findViewById(R.id.button_main_enter).setOnClickListener(buttonListener);
+		findViewById(R.id.button_main_allClear).setOnClickListener(buttonListener);
+		findViewById(R.id.button_main_clearExisting).setOnClickListener(buttonListener);
+		
+		findViewById(R.id.button_operation_divide).setOnClickListener(buttonListener);
+		findViewById(R.id.button_operation_multiply).setOnClickListener(buttonListener);
+		findViewById(R.id.button_operation_plus).setOnClickListener(buttonListener);
+		findViewById(R.id.button_operation_minus).setOnClickListener(buttonListener);
+		
+		findViewById(R.id.button_other_dot).setOnClickListener(buttonListener);
+		findViewById(R.id.button_other_setPlusMinus).setOnClickListener(buttonListener);
+		
+		findViewById(R.id.button_number_0).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_1).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_2).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_3).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_4).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_5).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_6).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_7).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_8).setOnClickListener(buttonListener);
+		findViewById(R.id.button_number_9).setOnClickListener(buttonListener);
+		
+	}
+
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+		// Inflate the menu; ethis adds items to the action bar if it is present.
+		getMenuInflater().inflate(R.menu.andoird_kalkulator, menu);
+		return true;
+	}
+	
+	
+	
+	//OBSLUGA KALULATORA
+	
+	final int INPUT_MODE = 0;
+	final int RESULT_MODE = 1;
+	final int ERROR_MODE = 2;
+	int displayMode;
+	boolean clearOnNextDigit, percent;
+	double lastNumber=0.0;
+	String lastOperator="0";
+	
+	
+
+	void setDisplayString(String s){
+		textView_large.setText(s);
+	}
+
+	String getDisplayString (){
+		return (String) textView_large.getText();
+	}
+
+	void addDigitToDisplay(int digit){
+		if (clearOnNextDigit)
+			setDisplayString("");
+
+		String inputString = getDisplayString();
+		
+		if (inputString.indexOf("0") == 0){
+			inputString = inputString.substring(1);
+		}
+
+		if ((!inputString.equals("0") || digit > 0)  && inputString.length() < R.integer.max_length_large){
+			setDisplayString(inputString + digit);
+		}
+		
+
+		displayMode = INPUT_MODE;
+		clearOnNextDigit = false;
+	}
+
+	void addDecimalPoint(){
+		displayMode = INPUT_MODE;
+
+		if (clearOnNextDigit)
+			setDisplayString("");
+
+		String inputString = getDisplayString();
+	
+		// If the input string already contains a decimal point, don't
+		//  do anything to it.
+		if (inputString.indexOf(".") < 0)
+			setDisplayString(new String(inputString + "."));
+	}
+
+	void processSignChange(){
+		if (displayMode == INPUT_MODE)
+		{
+			String input = getDisplayString();
+
+			if (input.length() > 0 && !input.equals("0"))
+			{
+				if (input.indexOf("-") == 0)
+					setDisplayString(input.substring(1));
+
+				else
+					setDisplayString("-" + input);
+			}
+			
+		}
+
+		else if (displayMode == RESULT_MODE)
+		{
+			double numberInDisplay = getNumberInDisplay();
+		
+			if (numberInDisplay != 0)
+				displayResult(-numberInDisplay);
+		}
+	}
+
+	void clearAll()	{
+		setDisplayString("0");
+		lastOperator = "0";
+		lastNumber = 0;
+		displayMode = INPUT_MODE;
+		clearOnNextDigit = true;
+	}
+	
+	void clearExisting(){
+		setDisplayString("0");
+		clearOnNextDigit = true;
+		displayMode = INPUT_MODE;
+	}
+
+	double getNumberInDisplay()	{
+		String input = (String )textView_large.getText();
+		return Double.parseDouble(input);
+	}
+	
+	
+	void processOperator(String op) {
+		if (displayMode != ERROR_MODE)
+		{
+			double numberInDisplay = getNumberInDisplay();
+
+			if (!lastOperator.equals("0"))	
+			{
+				try
+				{
+					double result = processLastOperator();
+					displayResult(result);
+					lastNumber = result;
+				}
+
+				catch (DivideByZeroException e)
+				{
+				}
+			}
+		
+			else
+			{
+				lastNumber = numberInDisplay;
+			}
+			
+			clearOnNextDigit = true;
+			lastOperator = op;
+		}
+	}
+
+	void processEquals(){
+		double result = 0;
+
+		if (displayMode != ERROR_MODE){
+			try			
+			{
+				result = processLastOperator();
+				displayResult(result);
+			}
+			
+			catch (DivideByZeroException e)	{
+				displayError("Cannot divide by zero!");
+			}
+
+			lastOperator = "0";
+		}
+	}
+
+	double processLastOperator() throws DivideByZeroException {
+		double result = 0;
+		double numberInDisplay = getNumberInDisplay();
+
+		if (lastOperator.equals("/"))
+		{
+			if (numberInDisplay == 0)
+				throw (new DivideByZeroException());
+
+			result = lastNumber / numberInDisplay;
+		}
+			
+		if (lastOperator.equals("*"))
+			result = lastNumber * numberInDisplay;
+
+		if (lastOperator.equals("-"))
+			result = lastNumber - numberInDisplay;
+
+		if (lastOperator.equals("+"))
+			result = lastNumber + numberInDisplay;
+
+		return result;
+	}
+
+	void displayResult(double result){
+		setDisplayString(Double.toString(result));
+		lastNumber = result;
+		displayMode = RESULT_MODE;
+		clearOnNextDigit = true;
+	}
+
+	void displayError(String errorMessage){
+		setDisplayString(errorMessage);
+		lastNumber = 0;
+		displayMode = ERROR_MODE;
+		clearOnNextDigit = true;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	public void onNumberAppend(String text){
+		
+		addDigitToDisplay(Integer.parseInt(text));
+		
+//		String value = (String) textView_large.getText();
+//		
+//		if(text.equals(".")){ //sprawdza czy nie chcemy dodac kropki
+//			if(value.contains("."))
+//				return;
+//		}
+////		if(clearOnNextDigit){
+////			value="";
+////			kalkulator.setAfterOperation(false);
+////		}
+//		
+//		textView_large.setText(value+text);
+
+	}
+
+	
+	public void onOperation(int operation){	
+		
+
+
+	}
+	
+	public void onAllClear(){
+		textView_large.setText("");
+	}
+	
+	public void onResult(){
+		double result = kalkulator.getResult();
+		textView_large.setText(result+"");
+		kalkulator.resetOperations();
+		kalkulator.resetNumbers();
+	}
+	
+}
+
+/**
+ * Listener przyciskow 
+ *
+ */
+class Listener_Buttons  implements OnClickListener {
+
+	private AndoirdKalkulator ak;
+	Listener_Buttons(AndoirdKalkulator ak){
+		this.ak=ak;
+	}
+	
+	@Override
+	public void onClick(View view) {
+		 switch (view.getId()) {
+		 
+		 //MAIN
+		    case R.id.button_main_clearExisting:{
+		    	ak.clearExisting();
+		    	break;
+		    }
+		    case R.id.button_main_enter:{
+		    	ak.processEquals();
+		    	break;
+		    }
+		    case R.id.button_main_allClear:{
+		    	ak.clearAll();
+		    	break;
+		    }
+		   //OTHER
+		    case R.id.button_operation_divide:{
+		    	ak.onOperation(Kalkulator.OPETATION_DIVIDE);
+		    	ak.processOperator("/");
+		    	break;
+		    }
+		    case R.id.button_operation_multiply:{
+		    	ak.onOperation(Kalkulator.OPETATION_MULTIPLY);
+		    	ak.processOperator("*");
+		    	break;
+		    }
+		    case R.id.button_operation_plus:{
+		    	ak.onOperation(Kalkulator.OPETATION_PLUS);
+		    	ak.processOperator("+");
+		    	break;
+		    }
+		    case R.id.button_operation_minus:{
+		    	ak.onOperation(Kalkulator.OPETATION_MINUS);
+		    	ak.processOperator("-");
+		    	break;
+		    }
+		    
+		    case R.id.button_other_setPlusMinus:{
+		    	ak.processSignChange();
+		    	break;
+		    }
+		    
+		 
+		 //LICZBY
+		    case R.id.button_number_0:{
+		    	ak.onNumberAppend("0");
+		    	break;
+		    }
+		    case R.id.button_number_1:{
+		    	ak.onNumberAppend("1");
+		    	break;
+		    }
+		    case R.id.button_number_2:{
+		    	ak.onNumberAppend("2");
+		    	break;
+		    }
+		    case R.id.button_number_3:{
+		    	ak.onNumberAppend("3");
+		    	break;
+		    }
+		    case R.id.button_number_4:{
+		    	ak.onNumberAppend("4");
+		    	break;
+		    }
+		    case R.id.button_number_5:{
+		    	ak.onNumberAppend("5");
+		    	break;
+		    }
+		    case R.id.button_number_6:{
+		    	ak.onNumberAppend("6");
+		    	break;
+		    }
+		    case R.id.button_number_7:{
+		    	ak.onNumberAppend("7");
+		    	break;
+		    }
+		    case R.id.button_number_8:{
+		    	ak.onNumberAppend("8");
+		    	break;
+		    }
+		    case R.id.button_number_9:{
+		    	ak.onNumberAppend("9");
+		    	break;
+		    }
+		    
+		    //OTHER
+		    case R.id.button_other_dot:{
+		    	ak.addDecimalPoint();
+		    	break;
+		    }
+		 }
+	}
+	
+}
+
+class DivideByZeroException extends Exception{
+	public DivideByZeroException()
+	{
+		super();
+	}
+	
+	public DivideByZeroException(String s)
+	{
+		super(s);
+	}
+}
+
+
+
